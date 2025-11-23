@@ -6,6 +6,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt
 import numpy as np
+import os
 
 class Main(QMainWindow):
     def __init__(self):
@@ -404,7 +405,7 @@ class Main(QMainWindow):
     #     self.left_result_table.sortItems(logicalIndex, Qt.AscendingOrder)
      
     # Export new excel file due to the current table data    
-    def left_export_excel(self):
+    # def left_export_excel(self):
         try:
             # Create a list to store the data
             data = []
@@ -453,7 +454,152 @@ class Main(QMainWindow):
 
         except Exception as e:
             QMessageBox.critical(self, "Error", str(e))
-            
+     
+    def clean_location_chain(self, loc_str):
+        # Cắt thành list
+        parts = [p.strip() for p in loc_str.split("-") if p.strip()]
+
+        seen = set()
+        ordered = []
+
+        for p in parts:
+            if p not in seen:
+                seen.add(p)
+                ordered.append(p)
+
+        return " - ".join(ordered)
+
+    def left_export_excel(self):
+        try:
+            # --------------------------------------------
+            # 1) ĐỌC DỮ LIỆU TỪ TABLE → TẠO DATAFRAME (Sheet1)
+            # --------------------------------------------
+            data = []
+            for row in range(self.left_result_table.rowCount()):
+                row_data = []
+                for column in range(self.left_result_table.columnCount()):
+                    item = self.left_result_table.item(row, column)
+                    text = item.text() if item is not None else ''
+                    # convert attempted number
+                    try:
+                        number = float(text)
+                        row_data.append(number)
+                    except ValueError:
+                        row_data.append(text)
+                data.append(row_data)
+
+            df = pd.DataFrame(
+                data,
+                columns=["Ngày Xuất", "Điểm Giao Hàng", "Trọng Lượng", "Giá Vận Chuyển"]
+            )
+
+            # --------------------------------------------
+            # 2) TẠO BẢN COPY & CHUẨN HÓA (Sheet2)
+            # --------------------------------------------
+            df2 = df.copy()
+
+            # xử lý merge dòng
+            rows_to_drop = []
+
+            for i in range(1, len(df2)):
+                current_date = str(df2.at[i, "Ngày Xuất"]).strip()
+                if current_date == "" or current_date.lower() == "nan":  # dòng con
+                    # tìm dòng cha gần nhất phía trên
+                    parent_idx = i - 1
+                    while parent_idx >= 0 and (
+                        str(df2.at[parent_idx, "Ngày Xuất"]).strip() == "" or 
+                        str(df2.at[parent_idx, "Ngày Xuất"]).lower() == "nan"
+                    ):
+                        parent_idx -= 1
+                    if parent_idx < 0:
+                        continue
+
+                    # Merge Location (chỉ merge nếu khác nhau + loại trùng)
+                    child_loc = str(df2.at[i, "Điểm Giao Hàng"]).strip()
+                    parent_loc = str(df2.at[parent_idx, "Điểm Giao Hàng"]).strip()
+
+                    if child_loc not in ["", "nan", "None"]:
+                        # parent trống → gán thẳng
+                        if parent_loc == "" or parent_loc.lower() == "nan":
+                            df2.at[parent_idx, "Điểm Giao Hàng"] = child_loc
+                        else:
+                            # chỉ merge nếu khác nhau
+                            if child_loc != parent_loc:
+                                merged = parent_loc + " - " + child_loc
+                                df2.at[parent_idx, "Điểm Giao Hàng"] = self.clean_location_chain(merged)
+
+                    # Merge Weight
+                    try:
+                        parent_weight = float(df2.at[parent_idx, "Trọng Lượng"])
+                    except:
+                        parent_weight = 0
+                    try:
+                        child_weight = float(df2.at[i, "Trọng Lượng"])
+                    except:
+                        child_weight = 0
+
+                    df2.at[parent_idx, "Trọng Lượng"] = parent_weight + child_weight
+
+                    # đánh dấu xoá dòng con
+                    rows_to_drop.append(i)
+
+            # xoá các dòng con
+            df2 = df2.drop(rows_to_drop).reset_index(drop=True)
+
+            # --------------------------------------------
+            # 3) XUẤT EXCEL: Sheet1 + Sheet2
+            # --------------------------------------------
+            file_dialog = QFileDialog()
+            file_path, _ = file_dialog.getSaveFileName(
+                self,
+                "Save Excel File",
+                "",
+                "Excel Files (*.xlsx)"
+            )
+            if not file_path:
+                return
+
+            writer = pd.ExcelWriter(file_path, engine='xlsxwriter')
+
+            # --- ghi Sheet1 ---
+            df.to_excel(writer, index=False, sheet_name='Sheet1')
+
+            # --- ghi Sheet2 ---
+            df2.to_excel(writer, index=False, sheet_name='Sheet2')
+
+            # --- format Times New Roman cho cả 2 sheet ---
+            workbook = writer.book
+            cell_format = workbook.add_format({'font_name': 'Times New Roman', 'font_size': 11})
+
+            # format Sheet1
+            ws1 = writer.sheets['Sheet1']
+            for r in range(len(df) + 1):
+                for c in range(len(df.columns)):
+                    if r == 0:
+                        ws1.write(r, c, df.columns[c], cell_format)
+                    else:
+                        ws1.write(r, c, df.iloc[r - 1, c], cell_format)
+
+            # format Sheet2
+            ws2 = writer.sheets['Sheet2']
+            for r in range(len(df2) + 1):
+                for c in range(len(df2.columns)):
+                    if r == 0:
+                        ws2.write(r, c, df2.columns[c], cell_format)
+                    else:
+                        ws2.write(r, c, df2.iloc[r - 1, c], cell_format)
+
+            writer.close()
+
+            QMessageBox.information(self, "Success", f"File saved to {file_path}")
+
+            try:
+                os.startfile(file_path)
+            except Exception as e:
+                QMessageBox.warning(self, "Warning", f"Cannot open file: {e}")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", str(e))
+
     ###############################
     
     # Open file dialog to select Excel file
