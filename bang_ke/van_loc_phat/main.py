@@ -395,6 +395,8 @@ class Main(QMainWindow):
             
             self.left_total_weight_label.setText(f"Total Weight: {self.left_total_weight}")
             self.left_total_weight_label.setVisible(True)
+
+            self.left_export_excel()
             
         except Exception as e:
             print(e)
@@ -406,54 +408,54 @@ class Main(QMainWindow):
      
     # Export new excel file due to the current table data    
     # def left_export_excel(self):
-        try:
-            # Create a list to store the data
-            data = []
-            for row in range(self.left_result_table.rowCount()):
-                row_data = []
-                for column in range(self.left_result_table.columnCount()):
-                    item = self.left_result_table.item(row, column)
-                    text = item.text() if item is not None else ''
-                    # Try to convert the text to a number
-                    try:
-                        number = float(text)
-                        row_data.append(number)
-                    except ValueError:
-                        row_data.append(text)
-                data.append(row_data)
-
-            # Convert the list to a DataFrame
-            df = pd.DataFrame(data, columns=["Ngày Xuất", "Điểm Giao Hàng", "Trọng Lượng", "Giá Vận Chuyển"])
-
-            # Prompt the user to select a save location and filename
-            file_dialog = QFileDialog()
-            file_path, _ = file_dialog.getSaveFileName(self, "Save Excel File", "", "Excel Files (*.xlsx)")
-            if file_path:
-                # Use xlsxwriter to write the DataFrame to Excel with formatting
-                writer = pd.ExcelWriter(file_path, engine='xlsxwriter')
-                df.to_excel(writer, index=False, sheet_name='Sheet1')
-
-                # Access the workbook and worksheet
-                workbook  = writer.book
-                worksheet = writer.sheets['Sheet1']
-
-                # Define the format for Times New Roman with font size 11
-                cell_format = workbook.add_format({'font_name': 'Times New Roman', 'font_size': 11})
-
-                # Apply the format to all cells
-                for row_num in range(len(df) + 1):  # +1 for the header
-                    for col_num in range(len(df.columns)):
-                        if row_num == 0:
-                            worksheet.write(row_num, col_num, df.columns[col_num], cell_format)
-                        else:
-                            worksheet.write(row_num, col_num, df.iloc[row_num - 1, col_num], cell_format)
-
-                # Close the Pandas Excel writer and output the Excel file.
-                writer.close()
-                QMessageBox.information(self, "Success", f"File saved to {file_path}")
-
-        except Exception as e:
-            QMessageBox.critical(self, "Error", str(e))
+    #     try:
+    #         # Create a list to store the data
+    #         data = []
+    #         for row in range(self.left_result_table.rowCount()):
+    #             row_data = []
+    #             for column in range(self.left_result_table.columnCount()):
+    #                 item = self.left_result_table.item(row, column)
+    #                 text = item.text() if item is not None else ''
+    #                 # Try to convert the text to a number
+    #                 try:
+    #                     number = float(text)
+    #                     row_data.append(number)
+    #                 except ValueError:
+    #                     row_data.append(text)
+    #             data.append(row_data)
+    #
+    #         # Convert the list to a DataFrame
+    #         df = pd.DataFrame(data, columns=["Ngày Xuất", "Điểm Giao Hàng", "Trọng Lượng", "Giá Vận Chuyển"])
+    #
+    #         # Prompt the user to select a save location and filename
+    #         file_dialog = QFileDialog()
+    #         file_path, _ = file_dialog.getSaveFileName(self, "Save Excel File", "", "Excel Files (*.xlsx)")
+    #         if file_path:
+    #             # Use xlsxwriter to write the DataFrame to Excel with formatting
+    #             writer = pd.ExcelWriter(file_path, engine='xlsxwriter')
+    #             df.to_excel(writer, index=False, sheet_name='Sheet1')
+    #
+    #             # Access the workbook and worksheet
+    #             workbook  = writer.book
+    #             worksheet = writer.sheets['Sheet1']
+    #
+    #             # Define the format for Times New Roman with font size 11
+    #             cell_format = workbook.add_format({'font_name': 'Times New Roman', 'font_size': 11})
+    #
+    #             # Apply the format to all cells
+    #             for row_num in range(len(df) + 1):  # +1 for the header
+    #                 for col_num in range(len(df.columns)):
+    #                     if row_num == 0:
+    #                         worksheet.write(row_num, col_num, df.columns[col_num], cell_format)
+    #                     else:
+    #                         worksheet.write(row_num, col_num, df.iloc[row_num - 1, col_num], cell_format)
+    #
+    #             # Close the Pandas Excel writer and output the Excel file.
+    #             writer.close()
+    #             QMessageBox.information(self, "Success", f"File saved to {file_path}")
+    #
+    #     except Exception as e:
+    #         QMessageBox.critical(self, "Error", str(e))
      
     def clean_location_chain(self, loc_str):
         # Cắt thành list
