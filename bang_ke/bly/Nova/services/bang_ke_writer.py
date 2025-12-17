@@ -15,26 +15,42 @@ class BangKeWriter:
             start = row
             end = row + merge - 1
 
-            # --- Insert rows if needed ---
             if merge > 1:
                 self.ws.insert_rows(start + 1, merge - 1)
 
-            # --- Write MERGED columns: ONLY top-left ---
+            # --- Write MERGED columns (TOP-LEFT ONLY) ---
             for col, val in order["base"].items():
-                self.ws[f"{col}{start}"].value = val
+                cell = self.ws[f"{col}{start}"]
 
-            # --- Write conts & cars (NOT merged) ---
+                # Long number → TEXT
+                if isinstance(val, int) and len(str(val)) >= 11:
+                    cell.value = str(val)
+                    cell.number_format = "@"
+
+                # Column N → NUMBER + accounting
+                elif col == "N":
+                    try:
+                        cell.value = float(val)
+                        cell.number_format = "#,##0"  # '#,##0.00' nếu cần
+                    except:
+                        cell.value = val
+
+                else:
+                    cell.value = val
+
+            # --- Write conts & cars ---
             for i in range(merge):
                 if i < len(order["conts"]):
                     self.ws[f"I{start + i}"].value = order["conts"][i]
                 if i < len(order["cars"]):
                     self.ws[f"J{start + i}"].value = order["cars"][i]
 
-            # --- Write gross (merged column O) ---
-            if order["gross"] is not None:
-                self.ws[f"O{start}"].value = order["gross"]
+            # --- ALWAYS write FORMULA for column O ---
+            o_cell = self.ws[f"O{start}"]
+            o_cell.value = f"=N{start}/(K{start}+L{start})"
+            o_cell.number_format = "#,##0.00"
 
-            # --- Merge cells AFTER writing ---
+            # --- Merge AFTER writing ---
             if merge > 1:
                 for col in list("ABCDEFGH") + ["K", "L", "M", "N", "O"]:
                     self.ws.merge_cells(f"{col}{start}:{col}{end}")
