@@ -57,4 +57,13 @@ class BangKeWriter:
 
             row = end + 1
 
-        self.wb.save(self.path)
+        # self.wb.save(self.path)
+        return row
+
+    def write_phu_phi_row(self, row, p, q, t_formula=None):
+        if p is not None:
+            self.ws[f"P{row}"].value = p
+        if q is not None:
+            self.ws[f"Q{row}"].value = q
+        if t_formula:
+            self.ws[f"T{row}"].value = f"= + {t_formula}"
