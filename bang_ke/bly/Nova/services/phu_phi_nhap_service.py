@@ -17,7 +17,8 @@ class PhuPhiNhapService:
         order_data: dict,
         theo_doi_ws,
         bang_ke_writer,
-        start_row: int
+        start_row: int,
+        order_start_row
     ):
         """
         Returns: last written row index
@@ -32,7 +33,8 @@ class PhuPhiNhapService:
                 row,
                 p=item["P"],
                 q=item["Q"],
-                t_formula=item["T"]
+                t_formula=item["T"],
+                order_start_row=order_start_row
             )
             row += 1
 

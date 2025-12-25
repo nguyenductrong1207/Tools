@@ -145,28 +145,36 @@ class MainWindow(QMainWindow):
             # ===============================
             for order in orders:
                 # =========================
-                # 1. Ghi NOVA NHẬP cho 1 đơn
+                # 1. Ghi NOVA NHẬP
                 # =========================
-                processed = processor.process([order])
+                order_start_row = current_row
 
+                processed = processor.process([order])
                 row_after_nova = writer.write_orders(
                     processed,
                     start_row=current_row
                 )
 
                 # =========================
-                # 2. Ghi PHỤ PHÍ cho chính đơn đó
+                # 2. Ghi PHỤ PHÍ
                 # =========================
                 row_after_phu_phi = phu_phi_service.write_phu_phi(
                     order_row_idx=order.row_idx,
                     order_data=order.data,
                     theo_doi_ws=theo_doi_ws,
                     bang_ke_writer=writer,
-                    start_row=current_row   
+                    start_row=order_start_row,
+                    order_start_row=order_start_row 
                 )
 
                 # =========================
-                # 3. Đơn tiếp theo bắt đầu sau PHỤ PHÍ
+                # 3. Ghi TỔNG ĐƠN (cột X)
+                # =========================
+                order_end_row = row_after_phu_phi - 1
+                writer.write_order_total(order_start_row, order_end_row)
+
+                # =========================
+                # 4. Cập nhật dòng cho đơn tiếp theo
                 # =========================
                 current_row = row_after_phu_phi
 

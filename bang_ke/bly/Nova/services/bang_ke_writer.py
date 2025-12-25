@@ -60,10 +60,39 @@ class BangKeWriter:
         # self.wb.save(self.path)
         return row
 
-    def write_phu_phi_row(self, row, p, q, t_formula=None):
+    def write_phu_phi_row(self, row, p, q, t_formula=None, order_start_row=None):
         if p is not None:
-            self.ws[f"P{row}"].value = p
+            cell_p = self.ws[f"P{row}"]
+            cell_p.value = p
+            cell_p.alignment = cell_p.alignment.copy(wrap_text=True)
+
         if q is not None:
-            self.ws[f"Q{row}"].value = q
-        if t_formula:
-            self.ws[f"T{row}"].value = f"= + {t_formula}"
+            cell_q = self.ws[f"Q{row}"]
+            cell_q.value = q
+            cell_q.alignment = cell_q.alignment.copy(wrap_text=True)
+
+        # --- xử lý công thức ---
+        if t_formula and order_start_row:
+            formula = str(t_formula)
+
+            # thay K, L theo HÀNG ĐẦU TIÊN CỦA ĐƠN
+            formula = formula.replace("K", f"K{order_start_row}")
+            formula = formula.replace("L", f"L{order_start_row}")
+
+            self.ws[f"T{row}"].value = f"={formula}"
+        # nếu t_formula trống → không làm gì
+
+    def write_order_total(self, order_start_row, order_end_row):
+        if order_end_row < order_start_row:
+            return
+
+        # merge cột X
+        if order_end_row > order_start_row:
+            self.ws.merge_cells(
+                f"X{order_start_row}:X{order_end_row}"
+            )
+
+        # gắn công thức SUM
+        self.ws[f"X{order_start_row}"].value = (
+            f"=SUM(W{order_start_row}:W{order_end_row})"
+        )
