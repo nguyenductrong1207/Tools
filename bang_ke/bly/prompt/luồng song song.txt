@@ -1,0 +1,9 @@
+mình cần thêm 1 luồng chạy song song, vẫn là từ mapping để lấy thông tin các cột từ file theo dõi để điền vào file bảng kê 
+- file mapping sẽ có thêm 2 sheet tương tự như sheet "Nova Nhập" lần lượt là "xuất" và "nhập"
+- file bảng kê ngoài điền thông tin như trước, thì giờ luồng song song sẽ lấy thông tin từ 2 sheet "xuất" và "nhập" ở file mapping để điền thông tin vào 2 sheet "xuất" và "nhập" ở file bảng kê
+- luồng song song này sẽ điền thông tin y hệt tất cả từ kiểu chữ, màu, màu nền,... nói chung thông tin ở file theo dõi sao thì copy y chang qua file bảng kê
+- vẫn như cũ mỗi đơn 1 hàng
+- dòng bắt đầu điền ở 2 sheet "xuất" và "nhập" ở file bảng kê là từ dòng 6 
+- trường hợp ở file theo dõi có dòng merge thì unmerge rồi lấy thông tin 
+
+hãy giúp mình code luồng song song này nhé, trước khi tiến hành code, mình cần xác nhận bạn đã hiểu tất cả logic, đưa ra hướng bạn định giải quyết như thế nào cho mình trước. sau khi mình xác nhận bạn đã nắm rõ logic, mục tiêu của luồng và hướng giải quyết hợp lý, tối ưu, tách file để dễ quản lý và mở rộng sau này, mình nhắn Xác Nhận thì lúc đó bạn tiến hành làm
