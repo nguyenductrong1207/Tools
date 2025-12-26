@@ -7,11 +7,8 @@ from PyQt5.QtCore import Qt
 import pandas as pd
 from openpyxl import load_workbook
 
-from services.mapping_service import MappingService
-from services.theo_doi_reader import TheoDoiReader
-from services.nova_nhap_processor import NovaNhapProcessor
-from services.bang_ke_writer import BangKeWriter
-from services.phu_phi_nhap_service import PhuPhiNhapService
+from ..services import (MappingService, TheoDoiReader, NovaNhapProcessor, BangKeWriter, PhuPhiNhapService,
+                        ParallelSheetWriter)
 
 
 class MainWindow(QMainWindow):
@@ -31,10 +28,29 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central)
         layout = QVBoxLayout(central)
 
+        DEV_MAPPING_PATH = r"D:\GitHub\Tools\bang_ke\bly\Nova\mapping.xlsx"
+        DEV_THEO_DOI_PATH = (r"D:\GitHub\Tools\bang_ke\bly\THEO DOI TAM UNG SONGLONG-MPF-CHINH NGUYEN 21.06.25.xlsx")
+        DEV_BANG_KE_PATH = (r"D:\GitHub\Tools\bang_ke\bly\BẢNG KÊ CÔNG NỢ-STONE - Sample - Copy.xlsx")
+
+        self.mapping_edit = QLineEdit()
+        self.mapping_edit.setReadOnly(True)
         layout.addLayout(self._file_picker(
-            "Mapping file:", self._pick_mapping))
+            "Mapping file:", self._pick_mapping, self.mapping_edit
+        ))
+        # ===== DEV ONLY – auto mapping =====
+        if DEV_MAPPING_PATH:
+            self.mapping_path = DEV_MAPPING_PATH
+            self.mapping_edit.setText(DEV_MAPPING_PATH)
+
+        self.theo_doi_edit = QLineEdit()
+        self.theo_doi_edit.setReadOnly(True)
         layout.addLayout(self._file_picker(
-            "File THEO DÕI:", self._pick_theo_doi))
+            "File THEO DÕI:", self._pick_theo_doi, self.theo_doi_edit
+        ))
+        # ===== DEV ONLY =====
+        if DEV_THEO_DOI_PATH:
+            self.theo_doi_path = DEV_THEO_DOI_PATH
+            self.theo_doi_edit.setText(DEV_THEO_DOI_PATH)
 
         sheet_layout = QHBoxLayout()
         sheet_layout.addWidget(QLabel("Sheets:"))
@@ -51,20 +67,31 @@ class MainWindow(QMainWindow):
         month_layout.addWidget(self.month_combo)
         layout.addLayout(month_layout)
 
+        self.bang_ke_edit = QLineEdit()
+        self.bang_ke_edit.setReadOnly(True)
         layout.addLayout(self._file_picker(
-            "File BẢNG KÊ:", self._pick_bang_ke))
+            "File BẢNG KÊ:", self._pick_bang_ke, self.bang_ke_edit
+        ))
+        # ===== DEV ONLY =====
+        if DEV_BANG_KE_PATH:
+            self.bang_ke_path = DEV_BANG_KE_PATH
+            self.bang_ke_edit.setText(DEV_BANG_KE_PATH)
 
         self.process_btn = QPushButton("PROCESSING")
         self.process_btn.setFixedHeight(40)
         self.process_btn.clicked.connect(self._on_process)
         layout.addWidget(self.process_btn, alignment=Qt.AlignCenter)
 
-    def _file_picker(self, label, callback):
+    def _file_picker(self, label, callback, edit=None):
         layout = QHBoxLayout()
         layout.addWidget(QLabel(label))
-        edit = QLineEdit()
-        edit.setReadOnly(True)
+
+        if edit is None:
+            edit = QLineEdit()
+            edit.setReadOnly(True)
+
         layout.addWidget(edit)
+
         btn = QPushButton("Chọn")
         btn.clicked.connect(lambda: callback(edit))
         layout.addWidget(btn)
@@ -87,7 +114,7 @@ class MainWindow(QMainWindow):
             self.sheet_combo.clear()
             for s in xls.sheet_names:
                 self.sheet_combo.addItem(s)
-            xls.close()    
+            xls.close()
             idx = self.sheet_combo.findText("NOVA NHẬP")
             if idx >= 0:
                 self.sheet_combo.setCurrentIndex(idx)
@@ -98,8 +125,7 @@ class MainWindow(QMainWindow):
         if path:
             self.bang_ke_path = path
             edit.setText(path)
-            
-            
+
     def _on_process(self):
         if not all([self.mapping_path, self.theo_doi_path, self.bang_ke_path]):
             QMessageBox.warning(self, "Thiếu file", "Vui lòng chọn đủ file")
@@ -164,7 +190,7 @@ class MainWindow(QMainWindow):
                     theo_doi_ws=theo_doi_ws,
                     bang_ke_writer=writer,
                     start_row=order_start_row,
-                    order_start_row=order_start_row 
+                    order_start_row=order_start_row
                 )
 
                 # =========================
@@ -179,6 +205,41 @@ class MainWindow(QMainWindow):
                 current_row = row_after_phu_phi
 
             # ===============================
+            # 5. PARALLEL SHEETS (NHẬP / XUẤT)
+            # ===============================
+
+            # load mapping
+            parallel_nhap_mapping = mapping_service.load_parallel_mapping("nhập")
+            # parallel_xuat_mapping = mapping_service.load_parallel_mapping("xuất")
+
+            # sheet nguồn
+            theo_doi_nhap_ws = theo_doi_wb["NOVA NHẬP"]
+            # theo_doi_xuat_ws = theo_doi_wb["NOVA XUẤT"]
+
+            # sheet đích
+            bang_ke_nhap_ws = writer.wb["nhập"]
+            # bang_ke_xuat_ws = writer.wb["xuất"]
+
+            # writers
+            nhap_writer = ParallelSheetWriter(bang_ke_nhap_ws)
+            # xuat_writer = ParallelSheetWriter(bang_ke_xuat_ws)
+
+            # ghi song song
+            nhap_writer.write_parallel(
+                theo_doi_ws=theo_doi_nhap_ws,
+                orders=orders,
+                mapping=parallel_nhap_mapping,
+                start_row=6
+            )
+
+            # xuat_writer.write_parallel(
+            #     theo_doi_ws=theo_doi_xuat_ws,
+            #     orders=orders,
+            #     mapping=parallel_xuat_mapping,
+            #     start_row=6
+            # )
+
+            # ===============================
             # 5. SAVE DUY NHẤT 1 LẦN
             # ===============================
             writer.wb.save(writer.path)
@@ -191,56 +252,3 @@ class MainWindow(QMainWindow):
 
         except Exception as e:
             QMessageBox.critical(self, "Lỗi", str(e))
-
-            
-            
-            
-            
-
-    # def _on_process(self):
-    #     if not all([self.mapping_path, self.theo_doi_path, self.bang_ke_path]):
-    #         QMessageBox.warning(self, "Thiếu file", "Vui lòng chọn đủ file")
-    #         return
-
-    #     try:
-    #         month = self.month_combo.currentData()
-
-    #         mapping = MappingService(
-    #             self.mapping_path).load_mapping("Nova Nhập")
-    #         orders = TheoDoiReader(
-    #             self.theo_doi_path).read_nova_nhap_by_month(month)
-
-    #         processor = NovaNhapProcessor(mapping)
-    #         processed_orders = processor.process(orders)
-
-    #         writer = BangKeWriter(self.bang_ke_path)
-    #         writer.write_orders(processed_orders, start_row=13)
-
-    #         QMessageBox.information(
-    #             self, "Hoàn tất",
-    #             f"Đã xử lý xong NOVA NHẬP – Tháng {month}\nSố đơn: {len(processed_orders)}"
-    #         )
-
-    #     except Exception as e:
-    #         QMessageBox.critical(self, "Lỗi", str(e))
-
-    #     try:
-    #         phu_phi_mapping = mapping_service.load_phu_phi_nhap()
-    #         phu_phi_service = PhuPhiNhapService(phu_phi_mapping)
-
-    #         # ws của THEO DÕI
-    #         from openpyxl import load_workbook
-    #         theo_doi_wb = load_workbook(self.theo_doi_path, data_only=True)
-    #         theo_doi_ws = theo_doi_wb["NOVA NHẬP"]
-
-    #         current_row = row_after_nova_nhap
-
-    #         current_row = phu_phi_service.write_phu_phi(
-    #             order_row_idx=order.row_idx,
-    #             order_data=order.data,
-    #             theo_doi_ws=theo_doi_ws,
-    #             bang_ke_writer=writer,
-    #             start_row=current_row
-    #         )
-    #     except Exception as e:
-    #         QMessageBox.critical(self, "Lỗi", str(e))

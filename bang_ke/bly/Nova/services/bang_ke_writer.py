@@ -1,5 +1,6 @@
 from openpyxl import load_workbook
 
+from ..utils import ensure_unmerged
 
 class BangKeWriter:
     def __init__(self, path):
@@ -20,6 +21,8 @@ class BangKeWriter:
 
             # --- Write MERGED columns (TOP-LEFT ONLY) ---
             for col, val in order["base"].items():
+                ensure_unmerged(self.ws, start, col)
+
                 cell = self.ws[f"{col}{start}"]
 
                 # Long number → TEXT
@@ -62,11 +65,13 @@ class BangKeWriter:
 
     def write_phu_phi_row(self, row, p, q, t_formula=None, order_start_row=None):
         if p is not None:
+            ensure_unmerged(self.ws, row, "P")
             cell_p = self.ws[f"P{row}"]
             cell_p.value = p
             cell_p.alignment = cell_p.alignment.copy(wrap_text=True)
 
         if q is not None:
+            ensure_unmerged(self.ws, row, "Q")
             cell_q = self.ws[f"Q{row}"]
             cell_q.value = q
             cell_q.alignment = cell_q.alignment.copy(wrap_text=True)

@@ -1,6 +1,6 @@
 from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
-from models.order_model import OrderModel
+from ..models import OrderModel
 import re
 
 

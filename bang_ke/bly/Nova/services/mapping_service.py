@@ -1,4 +1,5 @@
 import pandas as pd
+import re
 
 
 class MappingService:
@@ -47,3 +48,45 @@ class MappingService:
             "by_name": by_name,
             "footer": footer_rows
         }
+
+    def load_parallel_mapping(self, sheet_name):
+        """
+        sheet_name: 'nhập' hoặc 'xuất'
+        Mapping format:
+            Col A: source column (THEO DÕI)
+            Col B: target column (BẢNG KÊ)
+        """
+
+        df = pd.read_excel(
+            self.mapping_path,
+            sheet_name=sheet_name,
+            header=None
+        )
+
+        col_pattern = re.compile(r"^[A-Z]{1,3}$")
+
+        mappings = []
+
+        # 🔥 BỎ QUA DÒNG 1 (HEADER)
+        for i in range(1, len(df)):
+            src = df.iloc[i, 0]
+            dst = df.iloc[i, 1]
+
+            if pd.isna(src) or pd.isna(dst):
+                continue
+
+            src = str(src).strip().upper()
+            dst = str(dst).strip().upper()
+
+            # chỉ nhận chữ cột hợp lệ
+            if not col_pattern.match(src):
+                continue
+            if not col_pattern.match(dst):
+                continue
+
+            mappings.append({
+                "src": src,
+                "dst": dst
+            })
+
+        return mappings
