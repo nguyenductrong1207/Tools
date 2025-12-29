@@ -6,8 +6,9 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt
 import pandas as pd
 from openpyxl import load_workbook
+import traceback
 
-from ..services import (MappingService, TheoDoiReader, NovaNhapProcessor, BangKeWriter, PhuPhiNhapService,
+from ..services import (MappingService, TheoDoiReader, NovaNhapProcessor, BangKeWriter, PhuPhiService,
                         ParallelSheetWriter)
 
 
@@ -138,117 +139,143 @@ class MainWindow(QMainWindow):
             # 1. LOAD MAPPING
             # ===============================
             mapping_service = MappingService(self.mapping_path)
-            nova_mapping = mapping_service.load_mapping("Nova Nhập")
-            phu_phi_mapping = mapping_service.load_phu_phi_nhap()
+
+            nova_nhap_mapping = mapping_service.load_mapping("Nova Nhập")
+            nova_xuat_mapping = mapping_service.load_mapping("Nova Xuất")
+
+            phu_phi_nhap_mapping = mapping_service.load_phu_phi("Phụ Phí Nhập")
+            phu_phi_xuat_mapping = mapping_service.load_phu_phi("Phụ Phí Xuất")
+
+            parallel_nhap_mapping = mapping_service.load_parallel_mapping("nhập")
+            parallel_xuat_mapping = mapping_service.load_parallel_mapping("xuất")
 
             # ===============================
             # 2. READ THEO DÕI
             # ===============================
             reader = TheoDoiReader(self.theo_doi_path)
-            orders = reader.read_nova_nhap_by_month(month)
 
-            if not orders:
+            orders_nhap = reader.read_nova_nhap_by_month(month)
+            orders_xuat = reader.read_nova_xuat_by_month(month)
+
+            if not orders_nhap or not orders_xuat:
                 QMessageBox.information(self, "Không có dữ liệu", "Không có đơn nào")
                 return
 
             # ===============================
             # 3. INIT SERVICES
             # ===============================
-            processor = NovaNhapProcessor(nova_mapping)
-            phu_phi_service = PhuPhiNhapService(phu_phi_mapping)
+            # MỞ BẢNG KÊ 1 LẦN DUY NHẤT
+            writer = BangKeWriter(
+                self.bang_ke_path,
+                sheet_name="NOVA STONE-T.2026"
+            )
 
-            # 👉 MỞ BẢNG KÊ 1 LẦN DUY NHẤT
-            writer = BangKeWriter(self.bang_ke_path)
-
-            # 👉 MỞ THEO DÕI 1 LẦN (READ-ONLY)
+            # MỞ THEO DÕI 1 LẦN (READ-ONLY)
             theo_doi_wb = load_workbook(self.theo_doi_path, data_only=True)
-            theo_doi_ws = theo_doi_wb["NOVA NHẬP"]
+
+            # ===============================
+            # === LUỒNG NHẬP ===
+            # ===============================
+            processor = NovaNhapProcessor(nova_nhap_mapping)
+            phu_phi_service = PhuPhiService(phu_phi_nhap_mapping)
+
+            processed_nhap = processor.process(orders_nhap)
 
             current_row = 13
 
-            # ===============================
-            # 4. PROCESS TỪNG ĐƠN
-            # ===============================
-            for order in orders:
-                # =========================
-                # 1. Ghi NOVA NHẬP
-                # =========================
+            for processed_order, order in zip(processed_nhap, orders_nhap):
                 order_start_row = current_row
 
-                processed = processor.process([order])
                 row_after_nova = writer.write_orders(
-                    processed,
+                    [processed_order],
                     start_row=current_row
                 )
 
-                # =========================
-                # 2. Ghi PHỤ PHÍ
-                # =========================
                 row_after_phu_phi = phu_phi_service.write_phu_phi(
                     order_row_idx=order.row_idx,
                     order_data=order.data,
-                    theo_doi_ws=theo_doi_ws,
+                    theo_doi_ws=theo_doi_wb["NOVA NHẬP"],
                     bang_ke_writer=writer,
                     start_row=order_start_row,
                     order_start_row=order_start_row
                 )
 
-                # =========================
-                # 3. Ghi TỔNG ĐƠN (cột X)
-                # =========================
-                order_end_row = row_after_phu_phi - 1
-                writer.write_order_total(order_start_row, order_end_row)
+                writer.write_order_total(
+                    order_start_row,
+                    row_after_phu_phi - 1
+                )
 
-                # =========================
-                # 4. Cập nhật dòng cho đơn tiếp theo
-                # =========================
                 current_row = row_after_phu_phi
 
             # ===============================
-            # 5. PARALLEL SHEETS (NHẬP / XUẤT)
+            # === LUỒNG XUẤT ===
             # ===============================
+            processor = NovaNhapProcessor(nova_xuat_mapping)
+            phu_phi_service = PhuPhiService(phu_phi_xuat_mapping)
 
-            # load mapping
-            parallel_nhap_mapping = mapping_service.load_parallel_mapping("nhập")
-            # parallel_xuat_mapping = mapping_service.load_parallel_mapping("xuất")
+            processed_xuat = processor.process(orders_xuat)
 
-            # sheet nguồn
-            theo_doi_nhap_ws = theo_doi_wb["NOVA NHẬP"]
-            # theo_doi_xuat_ws = theo_doi_wb["NOVA XUẤT"]
+            for processed_order, order in zip(processed_xuat, orders_xuat):
+                order_start_row = current_row
 
-            # sheet đích
-            bang_ke_nhap_ws = writer.wb["nhập"]
-            # bang_ke_xuat_ws = writer.wb["xuất"]
+                row_after_nova = writer.write_orders(
+                    [processed_order],
+                    start_row=current_row
+                )
 
-            # writers
-            nhap_writer = ParallelSheetWriter(bang_ke_nhap_ws)
-            # xuat_writer = ParallelSheetWriter(bang_ke_xuat_ws)
+                row_after_phu_phi = phu_phi_service.write_phu_phi(
+                    order_row_idx=order.row_idx,
+                    order_data=order.data,
+                    theo_doi_ws=theo_doi_wb["NOVA XUẤT"],
+                    bang_ke_writer=writer,
+                    start_row=order_start_row,
+                    order_start_row=order_start_row
+                )
 
-            # ghi song song
-            nhap_writer.write_parallel(
-                theo_doi_ws=theo_doi_nhap_ws,
-                orders=orders,
+                writer.write_order_total(
+                    order_start_row,
+                    row_after_phu_phi - 1
+                )
+
+                current_row = row_after_phu_phi
+
+            # ===============================
+            # PARALLEL SHEETS
+            # ===============================
+            ParallelSheetWriter(
+                writer.wb["nhập"]
+            ).write_parallel(
+                theo_doi_ws=theo_doi_wb["NOVA NHẬP"],
+                orders=orders_nhap,
                 mapping=parallel_nhap_mapping,
                 start_row=6
             )
 
-            # xuat_writer.write_parallel(
-            #     theo_doi_ws=theo_doi_xuat_ws,
-            #     orders=orders,
-            #     mapping=parallel_xuat_mapping,
-            #     start_row=6
-            # )
+            ParallelSheetWriter(
+                writer.wb["xuất"]
+            ).write_parallel(
+                theo_doi_ws=theo_doi_wb["NOVA XUẤT"],
+                orders=orders_xuat,
+                mapping=parallel_xuat_mapping,
+                start_row=6
+            )
 
             # ===============================
-            # 5. SAVE DUY NHẤT 1 LẦN
+            # SAVE 1 LẦN DUY NHẤT
             # ===============================
             writer.wb.save(writer.path)
 
             QMessageBox.information(
                 self,
                 "Hoàn tất",
-                f"Đã xử lý xong NOVA NHẬP + PHỤ PHÍ – Tháng {month}\nSố đơn: {len(orders)}"
+                f"Đã xử lý xong – Tháng {month}\n"
+                f"\nNOVA NHẬP – Số đơn: {len(orders_nhap)}\n"
+                f"\nNOVA XUẤT – Số đơn: {len(orders_xuat)}"
             )
 
         except Exception as e:
+            print("===== FULL TRACEBACK =====")
+            traceback.print_exc()
+            print("===== END TRACEBACK =====")
+
             QMessageBox.critical(self, "Lỗi", str(e))

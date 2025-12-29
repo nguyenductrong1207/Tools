@@ -1,25 +1,29 @@
 from openpyxl.cell.cell import MergedCell
 from ..utils import ensure_unmerged
-
+from openpyxl.utils import get_column_letter
 
 class ParallelSheetWriter:
     def __init__(self, bang_ke_ws):
         self.ws = bang_ke_ws
 
     def _get_source_cell(self, ws, row, col_letter):
-        cell = ws[f"{col_letter}{row}"]
-
-        if isinstance(cell, MergedCell):
-            for merged_range in ws.merged_cells.ranges:
-                if cell.coordinate in merged_range:
-                    return ws.cell(
-                        row=merged_range.min_row,
-                        column=merged_range.min_col
-                    )
-        return cell
+        """
+        LUÔN lấy cell hiển thị, KHÔNG đụng tới cell gốc của merge
+        """
+        return ws[f"{col_letter}{row}"]
+        # cell = ws[f"{col_letter}{row}"]
+        #
+        # if isinstance(cell, MergedCell):
+        #     for merged_range in ws.merged_cells.ranges:
+        #         if cell.coordinate in merged_range:
+        #             return ws.cell(
+        #                 row=merged_range.min_row,
+        #                 column=merged_range.min_col
+        #             )
+        # return cell
 
     def _copy_cell(self, src_cell, dst_row, dst_col):
-        # 🔥 UNMERGE TRƯỚC
+        # chỉ unmerge nếu cell tồn tại
         ensure_unmerged(self.ws, dst_row, dst_col)
 
         dst_cell = self.ws[f"{dst_col}{dst_row}"]
@@ -43,12 +47,13 @@ class ParallelSheetWriter:
                 src_col = m["src"]
                 dst_col = m["dst"]
 
+                if isinstance(dst_col, int):
+                    dst_col = get_column_letter(dst_col)
+
                 src_cell = self._get_source_cell(
                     theo_doi_ws, src_row, src_col
                 )
 
                 self._copy_cell(src_cell, dst_row, dst_col)
-
             current_row += 1
-
         return current_row

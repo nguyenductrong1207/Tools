@@ -14,8 +14,8 @@ class MappingService:
                 mapping[str(row[0]).strip().upper()] = str(row[1]).strip().upper()
         return mapping
 
-    def load_phu_phi_nhap(self):
-        df = pd.read_excel(self.mapping_path, sheet_name="Phụ Phí Nhập", header=None)
+    def load_phu_phi(self, sheet_name: str) -> dict:
+        df = pd.read_excel(self.mapping_path, sheet_name=sheet_name, header=None)
 
         fixed_rows = []
         for r in [1, 2]:  # excel row 2–3

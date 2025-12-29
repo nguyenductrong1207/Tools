@@ -1,9 +1,9 @@
 from openpyxl.utils import get_column_letter
 
 
-class PhuPhiNhapService:
-    def __init__(self, phu_phi_mapping: dict):
-        self.mapping = phu_phi_mapping
+class PhuPhiService:
+    def __init__(self, mapping):
+        self.mapping = mapping
 
     def _to_int(self, val):
         try:
@@ -66,8 +66,10 @@ class PhuPhiNhapService:
                 row,
                 p=mapping_row["P"],
                 q=mapping_row["Q"],
-                t_formula=mapping_row["T"]
+                t_formula=mapping_row["T"],
+                order_start_row=order_start_row
             )
+
             row += 1
 
         # =========================
@@ -85,7 +87,8 @@ class PhuPhiNhapService:
                     row,
                     p=item["P"],
                     q=item["Q"],
-                    t_formula=item["T"]
+                    t_formula=item["T"],
+                    order_start_row = order_start_row
                 )
                 row += 1
 

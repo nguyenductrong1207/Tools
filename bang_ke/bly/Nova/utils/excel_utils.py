@@ -1,20 +1,23 @@
-from openpyxl.cell.cell import MergedCell
 from openpyxl.utils import get_column_letter
-
 
 def ensure_unmerged(ws, row, col):
     """
-    col: chữ cột ('A', 'B', ...) hoặc số cột (1-based)
+    Unmerge merged-range chứa (row, col).
+    Nếu openpyxl lỗi nội bộ → gỡ range thủ công.
     """
+
     if isinstance(col, int):
         col_letter = get_column_letter(col)
     else:
         col_letter = col
 
-    cell = ws[f"{col_letter}{row}"]
+    coord = f"{col_letter}{row}"
 
-    if isinstance(cell, MergedCell):
-        for merged_range in list(ws.merged_cells.ranges):
-            if cell.coordinate in merged_range:
-                ws.unmerge_cells(str(merged_range))
-                break
+    for rng in list(ws.merged_cells.ranges):
+        if coord in rng:
+            try:
+                ws.unmerge_cells(str(rng))
+            except KeyError:
+                # QUAN TRỌNG: gỡ merged range thủ công
+                ws.merged_cells.ranges.remove(rng)
+            break

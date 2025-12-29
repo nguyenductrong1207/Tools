@@ -1,14 +1,17 @@
 from openpyxl import load_workbook
 
 from ..utils import ensure_unmerged
+from openpyxl.utils import range_boundaries
+
 
 class BangKeWriter:
-    def __init__(self, path):
+    def __init__(self, path, sheet_name):
         self.path = path
         self.wb = load_workbook(path)
-        self.ws = self.wb.active
+        self.ws = self.wb[sheet_name]
 
     def write_orders(self, orders, start_row):
+        self._prepare_data_area(start_row)
         row = start_row
 
         for order in orders:
@@ -44,13 +47,18 @@ class BangKeWriter:
             # --- Write conts & cars ---
             for i in range(merge):
                 if i < len(order["conts"]):
+                    ensure_unmerged(self.ws, start + i, "I")
                     self.ws[f"I{start + i}"].value = order["conts"][i]
+
                 if i < len(order["cars"]):
+                    ensure_unmerged(self.ws, start + i, "J")
                     self.ws[f"J{start + i}"].value = order["cars"][i]
 
             # --- ALWAYS write FORMULA for column O ---
+            ensure_unmerged(self.ws, start, "O")
             o_cell = self.ws[f"O{start}"]
             o_cell.value = f"=N{start}/(K{start}+L{start})"
+
             o_cell.number_format = "#,##0.00"
 
             # --- Merge AFTER writing ---
@@ -84,6 +92,7 @@ class BangKeWriter:
             formula = formula.replace("K", f"K{order_start_row}")
             formula = formula.replace("L", f"L{order_start_row}")
 
+            ensure_unmerged(self.ws, row, "T")
             self.ws[f"T{row}"].value = f"={formula}"
         # nếu t_formula trống → không làm gì
 
@@ -98,6 +107,24 @@ class BangKeWriter:
             )
 
         # gắn công thức SUM
+        ensure_unmerged(self.ws, order_start_row, "X")
         self.ws[f"X{order_start_row}"].value = (
             f"=SUM(W{order_start_row}:W{order_end_row})"
         )
+
+    def _prepare_data_area(self, start_row, end_col="Z"):
+        """
+        Unmerge tất cả merged-range nằm TỪ start_row TRỞ XUỐNG
+        KHÔNG ĐỤNG HEADER
+        """
+        to_unmerge = []
+
+        for rng in self.ws.merged_cells.ranges:
+            min_col, min_row, max_col, max_row = range_boundaries(str(rng))
+
+            # chỉ unmerge vùng data
+            if min_row >= start_row:
+                to_unmerge.append(str(rng))
+
+        for rng in to_unmerge:
+            self.ws.unmerge_cells(rng)
